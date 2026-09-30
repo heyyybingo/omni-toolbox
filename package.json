@@ -1,0 +1,58 @@
+{
+  "name": "omni-toolbox",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run",
+    "test:e2e": "node node_modules/@playwright/test/cli.js test",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.1.1",
+    "@types/diff": "^8.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "diff": "^9.0.0",
+    "dompdf.js": "^2.0.6",
+    "exifreader": "^4.45.2",
+    "gifenc": "^1.0.3",
+    "heic2any": "^0.0.4",
+    "html-to-pdfmake": "^2.5.34",
+    "lamejs": "^1.2.1",
+    "libflacjs": "^5.6.0",
+    "lucide-react": "^0.469.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-lib-plus-encrypt": "^1.1.0",
+    "pdfjs-dist": "^4.10.38",
+    "pdfmake": "^0.3.11",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0",
+    "tesseract.js": "^7.0.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6",
+    "vitest": "^2.1.8"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.21.5": true
+  }
+}

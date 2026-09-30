@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+build/
+
+# Logs & diagnostic data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Test & coverage results
+test-results/
+playwright-report/
+blob-report/
+coverage/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment & local state
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.gemini/
