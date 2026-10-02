@@ -43,7 +43,7 @@ import { PresetSelect, type PresetItem } from '@/components/PresetSelect';
 import { FullscreenLayer } from '@/components/Fullscreen';
 import { listArtifacts, putArtifacts, clearArtifacts, deleteArtifacts, type StoredArtifact } from '@/engine/artifact-store';
 import { LivePreviewPanel } from '@/components/LivePreviewPanel';
-import { generateFaviconPackage, parseImageExif } from '@/engine/dev-tools';
+import { generateFaviconPackage, parseImageExif, parseJwt, parseColor } from '@/engine/dev-tools';
 import { JsonYamlTool } from '@/components/tools/JsonYamlTool';
 import { JsonCsvTool } from '@/components/tools/JsonCsvTool';
 import { JsonToTsTool } from '@/components/tools/JsonToTsTool';
@@ -147,8 +147,23 @@ export default function App() {
     lastInspectorRef.current = inspector;
   }
   const displayInspector = inspector || lastInspectorRef.current;
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('lt-theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+    } catch {
+      // ignore
+    }
+    return 'light';
+  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('lt-sidebar') === 'collapsed';
+    } catch {
+      // ignore
+    }
+    return false;
+  });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveArtifacts, setSaveArtifacts] = useState(true);
@@ -344,8 +359,6 @@ export default function App() {
 
   useEffect(() => {
     try {
-      setTheme((localStorage.getItem('lt-theme') as 'light') || 'light');
-      setSidebarCollapsed(localStorage.getItem('lt-sidebar') === 'collapsed');
       setSaveArtifacts(localStorage.getItem('lt-save-artifacts') !== '0');
       setFavorites(JSON.parse(localStorage.getItem('lt-favs') || '[]'));
       const storedPresets = localStorage.getItem('lt-presets');
@@ -562,7 +575,7 @@ export default function App() {
     const success: JobResult[] = [];
 
     // Batch whole-document aggregators
-    if (tool.kind === 'image-to-pdf' && !onlyIndices) {
+    if (tool.kind === 'image-to-pdf') {
       try {
         const r = await processImageToPdf(filesToRun);
         success.push(...r);
@@ -574,7 +587,7 @@ export default function App() {
           setJobStatus(tool.id, idx, 'failed', msg);
         }
       }
-    } else if (tool.kind === 'pdf-merge' && !onlyIndices) {
+    } else if (tool.kind === 'pdf-merge') {
       try {
         const r = await processPdfMerge(filesToRun, session.outName || 'merged.pdf');
         success.push(...r);
@@ -586,7 +599,7 @@ export default function App() {
           setJobStatus(tool.id, idx, 'failed', msg);
         }
       }
-    } else if (tool.kind === 'image-stitch' && !onlyIndices) {
+    } else if (tool.kind === 'image-stitch') {
       try {
         const r = await processImageStitch(filesToRun, { direction: session.stitchDir, gap: session.stitchGap });
         success.push(r);
@@ -2045,7 +2058,7 @@ export default function App() {
                 <p className="text-xs text-muted-foreground">当前 Unix 时间戳 (秒)</p>
                 <p className="font-mono text-2xl font-bold">{l4TimestampNow}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  本地时间: {new Date(l4TimestampNow * 1000).toLocaleString('zh-CN', { hour12: false })}
+                  系统时间: {new Date(l4TimestampNow * 1000).toLocaleString('zh-CN', { hour12: false })}
                 </p>
               </div>
               <Button
@@ -2105,13 +2118,14 @@ export default function App() {
     }
 
     if (tool.kind === 'color') {
+      const colorResult = parseColor(session.colorText || '#0C66E4');
       return (
         <Card className="space-y-4 p-4">
           <CardTitle className="text-sm font-semibold">颜色提取与格式转换</CardTitle>
           <div className="flex items-center gap-4">
             <input
               type="color"
-              value={session.colorText || '#0C66E4'}
+              value={colorResult.hex.toLowerCase()}
               onChange={(e) => patch(tool.id, { colorText: e.target.value })}
               className="h-14 w-20 cursor-pointer rounded border border-border bg-card p-1"
             />
@@ -2123,57 +2137,37 @@ export default function App() {
               />
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(() => {
-              const hex = session.colorText || '#0C66E4';
-              const r = parseInt(hex.slice(1, 3) || '0', 16);
-              const g = parseInt(hex.slice(3, 5) || '0', 16);
-              const b = parseInt(hex.slice(5, 7) || '0', 16);
-              const rgbStr = `rgb(${r}, ${g}, ${b})`;
-              return [
-                { label: 'HEX', val: hex },
-                { label: 'RGB', val: rgbStr },
-                { label: 'CSS', val: `${hex};` },
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-border p-3 bg-muted/10 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-semibold">{item.label}</span>
-                    <button
-                      type="button"
-                      className="text-xs text-primary hover:underline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(item.val);
-                        notify('已复制', item.val, 'success');
-                      }}
-                    >
-                      复制
-                    </button>
-                  </div>
-                  <p className="font-mono text-xs">{item.val}</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: 'HEX', val: colorResult.hex },
+              { label: 'RGB', val: colorResult.rgb.css },
+              { label: 'HSL', val: colorResult.hsl.css },
+              { label: 'CSS', val: `${colorResult.hex.toLowerCase()};` },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-border p-3 bg-muted/10 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold">{item.label}</span>
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(item.val);
+                      notify('已复制', item.val, 'success');
+                    }}
+                  >
+                    复制
+                  </button>
                 </div>
-              ));
-            })()}
+                <p className="font-mono text-xs">{item.val}</p>
+              </div>
+            ))}
           </div>
         </Card>
       );
     }
 
     if (tool.kind === 'jwt') {
-      const parseJwt = (token: string) => {
-        try {
-          const parts = token.trim().split('.');
-          if (parts.length < 2) return null;
-          const decode = (str: string) => JSON.parse(decodeURIComponent(escape(atob(str.replace(/-/g, '+').replace(/_/g, '/')))));
-          return {
-            header: decode(parts[0]),
-            payload: decode(parts[1]),
-          };
-        } catch {
-          return null;
-        }
-      };
-
-      const parsed = parseJwt(session.jwtText);
+      const parsed = parseJwt(session.jwtText || '');
 
       return (
         <Card className="space-y-4 p-4">
@@ -2283,6 +2277,7 @@ export default function App() {
       {/* 1. File Upload / Queue Stage */}
       {session.files.length === 0 ? (
         <Dropzone
+          inputRef={fileInputRef}
           accept={tool.accept}
           multiple
           onFilesSelected={addFiles}

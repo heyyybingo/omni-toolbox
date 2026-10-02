@@ -1,29 +1,7 @@
 import { PDFDocument, degrees, StandardFonts, rgb } from 'pdf-lib';
 
-export function parsePageRange(rangeStr: string | undefined, pageCount: number): number[] {
-  const text = (rangeStr || '').trim();
-  if (!text) return Array.from({ length: pageCount }, (_, i) => i);
-  const pages = new Set<number>();
-  for (const part of text.split(',')) {
-    const piece = part.trim();
-    if (!piece) continue;
-    if (piece.includes('-')) {
-      const [aRaw, bRaw] = piece.split('-');
-      const a = parseInt(aRaw.trim(), 10);
-      const b = parseInt(bRaw.trim(), 10);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error('页码范围无效');
-      for (let p = Math.min(a, b); p <= Math.max(a, b); p++) {
-        if (p >= 1 && p <= pageCount) pages.add(p - 1);
-      }
-    } else {
-      const p = parseInt(piece, 10);
-      if (!Number.isFinite(p)) throw new Error('页码范围无效');
-      if (p >= 1 && p <= pageCount) pages.add(p - 1);
-    }
-  }
-  if (!pages.size) throw new Error('页码范围无效');
-  return [...pages].sort((x, y) => x - y);
-}
+import { parsePageRange } from '@/lib/utils';
+export { parsePageRange };
 
 export async function deletePdfPages(buffer: ArrayBuffer, range: string): Promise<Uint8Array> {
   const src = await PDFDocument.load(buffer, { ignoreEncryption: true });

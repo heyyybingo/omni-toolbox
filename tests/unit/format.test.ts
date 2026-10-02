@@ -37,20 +37,130 @@ describe('names', () => {
 });
 
 describe('parsePageRange', () => {
-  it('empty means all pages', () => {
-    expect(parsePageRange('', 3)).toEqual([0, 1, 2]);
-    expect(parsePageRange(null, 2)).toEqual([0, 1]);
+  describe('empty and default handling', () => {
+    it('defaults to all pages when input is empty, null, or undefined', () => {
+      expect(parsePageRange('', 3)).toEqual([0, 1, 2]);
+      expect(parsePageRange(null, 2)).toEqual([0, 1]);
+      expect(parsePageRange(undefined, 4)).toEqual([0, 1, 2, 3]);
+      expect(parsePageRange('   ', 3)).toEqual([0, 1, 2]);
+      expect(parsePageRange('', 0)).toEqual([]);
+    });
+
+    it('handles bare hyphen as full document range', () => {
+      expect(parsePageRange('-', 4)).toEqual([0, 1, 2, 3]);
+      expect(parsePageRange('  -  ', 3)).toEqual([0, 1, 2]);
+    });
   });
 
-  it('parses ranges and singles', () => {
-    expect(parsePageRange('1-3,5', 5)).toEqual([0, 1, 2, 4]);
-    expect(parsePageRange('2', 3)).toEqual([1]);
-    expect(parsePageRange('3-1', 3)).toEqual([0, 1, 2]);
+  describe('discrete page numbers', () => {
+    it('parses single pages correctly', () => {
+      expect(parsePageRange('1', 5)).toEqual([0]);
+      expect(parsePageRange('3', 5)).toEqual([2]);
+      expect(parsePageRange('5', 5)).toEqual([4]);
+    });
+
+    it('parses comma-separated discrete pages', () => {
+      expect(parsePageRange('1, 3, 5', 5)).toEqual([0, 2, 4]);
+      expect(parsePageRange('  2 ,  4  ', 5)).toEqual([1, 3]);
+    });
+
+    it('deduplicates and sorts discrete page numbers', () => {
+      expect(parsePageRange('1, 1, 2, 2, 3', 5)).toEqual([0, 1, 2]);
+      expect(parsePageRange('5, 2, 4, 1', 5)).toEqual([0, 1, 3, 4]);
+    });
   });
 
-  it('rejects invalid', () => {
-    expect(() => parsePageRange('abc', 3)).toThrow();
-    expect(() => parsePageRange('9', 3)).toThrow();
+  describe('closed ranges (A-B)', () => {
+    it('parses standard ascending ranges', () => {
+      expect(parsePageRange('1-3', 5)).toEqual([0, 1, 2]);
+      expect(parsePageRange('2-4', 5)).toEqual([1, 2, 3]);
+      expect(parsePageRange('1-5', 5)).toEqual([0, 1, 2, 3, 4]);
+    });
+
+    it('handles inverted ranges (B-A) by sorting min to max', () => {
+      expect(parsePageRange('3-1', 5)).toEqual([0, 1, 2]);
+      expect(parsePageRange('5-2', 5)).toEqual([1, 2, 3, 4]);
+    });
+
+    it('handles single-page ranges (A-A)', () => {
+      expect(parsePageRange('2-2', 5)).toEqual([1]);
+    });
+
+    it('tolerates spaces around the hyphen in range', () => {
+      expect(parsePageRange(' 2 - 4 ', 5)).toEqual([1, 2, 3]);
+    });
+  });
+
+  describe('open ranges (A- and -N)', () => {
+    it('parses open-ended ranges (A-) up to totalPages', () => {
+      expect(parsePageRange('1-', 5)).toEqual([0, 1, 2, 3, 4]);
+      expect(parsePageRange('3-', 5)).toEqual([2, 3, 4]);
+      expect(parsePageRange('5-', 5)).toEqual([4]);
+      expect(parsePageRange('  2 -  ', 4)).toEqual([1, 2, 3]);
+    });
+
+    it('parses open-start ranges (-N) from page 1 to N', () => {
+      expect(parsePageRange('-1', 5)).toEqual([0]);
+      expect(parsePageRange('-3', 5)).toEqual([0, 1, 2]);
+      expect(parsePageRange('-5', 5)).toEqual([0, 1, 2, 3, 4]);
+      expect(parsePageRange('  - 3  ', 5)).toEqual([0, 1, 2]);
+    });
+  });
+
+  describe('clamping and boundary behavior', () => {
+    it('clamps open-start range exceeding pageCount', () => {
+      expect(parsePageRange('-10', 4)).toEqual([0, 1, 2, 3]);
+    });
+
+    it('clamps range ending beyond pageCount', () => {
+      expect(parsePageRange('2-10', 4)).toEqual([1, 2, 3]);
+    });
+
+    it('clamps range starting below 1', () => {
+      expect(parsePageRange('0-3', 4)).toEqual([0, 1, 2]);
+    });
+  });
+
+  describe('mixed and complex combinations', () => {
+    it('parses mixed discrete, closed, and open ranges', () => {
+      expect(parsePageRange('1, 3-4, 6-', 7)).toEqual([0, 2, 3, 5, 6]);
+      expect(parsePageRange('-2, 4, 6-7', 7)).toEqual([0, 1, 3, 5, 6]);
+    });
+
+    it('handles overlapping ranges cleanly', () => {
+      expect(parsePageRange('-2, 2-', 4)).toEqual([0, 1, 2, 3]);
+      expect(parsePageRange('1-3, 2-4', 5)).toEqual([0, 1, 2, 3]);
+    });
+
+    it('ignores stray commas and whitespace', () => {
+      expect(parsePageRange(', 1 , , 3-4 , ', 5)).toEqual([0, 2, 3]);
+    });
+  });
+
+  describe('invalid input rejection', () => {
+    it('throws error for non-numeric tokens', () => {
+      expect(() => parsePageRange('abc', 3)).toThrow();
+      expect(() => parsePageRange('1-abc', 3)).toThrow();
+      expect(() => parsePageRange('abc-3', 3)).toThrow();
+      expect(() => parsePageRange('1#3', 3)).toThrow();
+    });
+
+    it('throws error for multiple hyphens in range', () => {
+      expect(() => parsePageRange('1-2-3', 5)).toThrow();
+      expect(() => parsePageRange('--3', 5)).toThrow();
+    });
+
+    it('throws error when no valid pages result', () => {
+      expect(() => parsePageRange('9', 3)).toThrow();
+      expect(() => parsePageRange('0', 3)).toThrow();
+      expect(() => parsePageRange('6-10', 5)).toThrow();
+      expect(() => parsePageRange('6-', 5)).toThrow();
+      expect(() => parsePageRange(',,,', 3)).toThrow();
+    });
+
+    it('throws error when pageCount is non-positive', () => {
+      expect(() => parsePageRange('1-3', 0)).toThrow();
+    });
   });
 });
 
@@ -176,3 +286,41 @@ describe('computeTabSlices', () => {
     expect(res.overflowTabs).toEqual(['t3', 't4']);
   });
 });
+
+describe('isVisualTool mapping', () => {
+  it('recognizes image-transform as a visual tool', async () => {
+    const { isVisualTool } = await import('@/engine/live-preview');
+    expect(isVisualTool('image-transform')).toBe(true);
+  });
+
+  it('maintains image-rotate as backward compatible alias', async () => {
+    const { isVisualTool } = await import('@/engine/live-preview');
+    expect(isVisualTool('image-rotate')).toBe(true);
+  });
+
+  it('recognizes all other visual image and PDF tools', async () => {
+    const { isVisualTool } = await import('@/engine/live-preview');
+    const expected = [
+      'image-convert',
+      'image-compress',
+      'image-resize',
+      'image-watermark',
+      'image-color',
+      'pdf-watermark',
+      'pdf-rotate',
+      'pdf-img-wm',
+    ];
+    for (const id of expected) {
+      expect(isVisualTool(id)).toBe(true);
+    }
+  });
+
+  it('rejects non-visual tools', async () => {
+    const { isVisualTool } = await import('@/engine/live-preview');
+    expect(isVisualTool('jwt')).toBe(false);
+    expect(isVisualTool('base64')).toBe(false);
+    expect(isVisualTool('json-format')).toBe(false);
+    expect(isVisualTool('uuid')).toBe(false);
+  });
+});
+

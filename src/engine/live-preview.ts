@@ -25,6 +25,7 @@ export function isVisualTool(toolId: string): boolean {
     'image-compress',
     'image-resize',
     'image-watermark',
+    'image-transform',
     'image-rotate',
     'image-color',
     'pdf-watermark',
@@ -206,7 +207,7 @@ export async function generateLivePreview(
   let exportMime = session.format || (decoded.type === 'image/png' ? 'image/png' : 'image/jpeg');
   let exportQuality = (session.quality ?? 80) / 100;
 
-  if (toolId === 'image-rotate') {
+  if (toolId === 'image-transform' || toolId === 'image-rotate') {
     const angle = (session.angle || 0) % 360;
     const isQuarter = angle === 90 || angle === 270;
     canvas.width = isQuarter ? targetHeight : targetWidth;

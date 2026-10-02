@@ -220,7 +220,7 @@ export const TOOLS: Record<string, ToolDef> = {
     id: 'hash',
     group: '开发',
     title: '哈希',
-    desc: 'SHA-1/256/384/512 摘要。',
+    desc: 'SHA-1/256/512 摘要。',
     layout: 'l4',
     accept: '*',
     kind: 'hash',

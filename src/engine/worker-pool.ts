@@ -48,7 +48,20 @@ export class WorkerPool {
       this.drain();
     };
     slot.worker.onerror = (err) => {
+      const job = slot.job;
       slot.busy = false;
+      slot.job = undefined;
+
+      if (job) {
+        let msg = 'Worker error';
+        if (err instanceof Error) {
+          msg = err.message;
+        } else if (err && typeof (err as ErrorEvent).message === 'string' && (err as ErrorEvent).message) {
+          msg = (err as ErrorEvent).message;
+        }
+        job.reject(new Error(msg));
+      }
+
       try {
         slot.worker.terminate();
       } catch {
@@ -89,11 +102,18 @@ export class WorkerPool {
   destroy() {
     this.destroyed = true;
     for (const slot of this.all) {
+      if (slot.job) {
+        slot.job.reject(new Error('Pool destroyed'));
+        slot.job = undefined;
+      }
       try {
         slot.worker.terminate();
       } catch {
         /* ignore */
       }
+    }
+    for (const job of this.queue) {
+      job.reject(new Error('Pool destroyed'));
     }
     this.all = [];
     this.idle = [];

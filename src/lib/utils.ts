@@ -76,27 +76,61 @@ export function uniqueName(name: string, used: Set<string>): string {
 
 export function parsePageRange(rangeStr: string | null | undefined, pageCount: number): number[] {
   const text = (rangeStr || '').trim();
-  if (!text) return Array.from({ length: pageCount }, (_, i) => i);
+  if (!text) return Array.from({ length: Math.max(0, pageCount) }, (_, i) => i);
+  if (pageCount <= 0) throw new Error('页码范围无效');
+
   const pages = new Set<number>();
   for (const part of text.split(',')) {
     const piece = part.trim();
     if (!piece) continue;
+
     if (piece.includes('-')) {
-      const [aRaw, bRaw] = piece.split('-');
-      const a = parseInt(aRaw.trim(), 10);
-      const b = parseInt(bRaw.trim(), 10);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error('页码范围无效');
-      const start = Math.min(a, b);
-      const end = Math.max(a, b);
-      for (let p = start; p <= end; p++) {
-        if (p >= 1 && p <= pageCount) pages.add(p - 1);
+      const parts = piece.split('-');
+      if (parts.length !== 2) throw new Error('页码范围无效');
+
+      const aRaw = parts[0].trim();
+      const bRaw = parts[1].trim();
+
+      let start: number;
+      let end: number;
+
+      if (!aRaw && !bRaw) {
+        // '-' covers all pages
+        start = 1;
+        end = pageCount;
+      } else if (!aRaw) {
+        // '-N'
+        if (!/^\d+$/.test(bRaw)) throw new Error('页码范围无效');
+        start = 1;
+        end = parseInt(bRaw, 10);
+      } else if (!bRaw) {
+        // 'A-'
+        if (!/^\d+$/.test(aRaw)) throw new Error('页码范围无效');
+        start = parseInt(aRaw, 10);
+        end = pageCount;
+      } else {
+        // 'A-B'
+        if (!/^\d+$/.test(aRaw) || !/^\d+$/.test(bRaw)) throw new Error('页码范围无效');
+        const a = parseInt(aRaw, 10);
+        const b = parseInt(bRaw, 10);
+        start = Math.min(a, b);
+        end = Math.max(a, b);
+      }
+
+      const clampedStart = Math.max(1, start);
+      const clampedEnd = Math.min(pageCount, end);
+      for (let p = clampedStart; p <= clampedEnd; p++) {
+        pages.add(p - 1);
       }
     } else {
+      if (!/^\d+$/.test(piece)) throw new Error('页码范围无效');
       const p = parseInt(piece, 10);
-      if (!Number.isFinite(p)) throw new Error('页码范围无效');
-      if (p >= 1 && p <= pageCount) pages.add(p - 1);
+      if (p >= 1 && p <= pageCount) {
+        pages.add(p - 1);
+      }
     }
   }
+
   if (!pages.size) throw new Error('页码范围无效');
   return [...pages].sort((a, b) => a - b);
 }

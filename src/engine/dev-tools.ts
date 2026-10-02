@@ -484,3 +484,126 @@ export async function parseImageExif(file: File): Promise<ParsedExifData> {
     allTags,
   };
 }
+
+// ==========================================
+// 7. JWT Decoder
+// ==========================================
+
+export interface ParsedJwt {
+  header: Record<string, unknown>;
+  payload: Record<string, unknown>;
+}
+
+export function parseJwt(token: string): ParsedJwt | null {
+  try {
+    const parts = token.trim().split('.');
+    if (parts.length < 2) return null;
+
+    const decodePart = (str: string): Record<string, unknown> => {
+      let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4;
+      if (pad) {
+        b64 += '='.repeat(4 - pad);
+      }
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return JSON.parse(new TextDecoder().decode(bytes));
+    };
+
+    return {
+      header: decodePart(parts[0]),
+      payload: decodePart(parts[1]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ==========================================
+// 8. Color Tool & HSL Converter
+// ==========================================
+
+export interface HslColor {
+  h: number;
+  s: number;
+  l: number;
+  css: string;
+}
+
+export interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+  css: string;
+}
+
+export interface ColorConversionResult {
+  hex: string;
+  rgb: RgbColor;
+  hsl: HslColor;
+}
+
+export function rgbToHsl(r: number, g: number, b: number): HslColor {
+  const rNorm = Math.max(0, Math.min(255, r)) / 255;
+  const gNorm = Math.max(0, Math.min(255, g)) / 255;
+  const bNorm = Math.max(0, Math.min(255, b)) / 255;
+  const max = Math.max(rNorm, gNorm, bNorm);
+  const min = Math.min(rNorm, gNorm, bNorm);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (delta !== 0) {
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    if (max === rNorm) {
+      h = ((gNorm - bNorm) / delta + (gNorm < bNorm ? 6 : 0)) * 60;
+    } else if (max === gNorm) {
+      h = ((bNorm - rNorm) / delta + 2) * 60;
+    } else {
+      h = ((rNorm - gNorm) / delta + 4) * 60;
+    }
+  }
+
+  const hRound = Math.round(h);
+  const sRound = Math.round(s * 100);
+  const lRound = Math.round(l * 100);
+
+  return {
+    h: hRound,
+    s: sRound,
+    l: lRound,
+    css: `hsl(${hRound}, ${sRound}%, ${lRound}%)`,
+  };
+}
+
+export function parseColor(input: string): ColorConversionResult {
+  const fallback = '#0C66E4';
+  let raw = (input || fallback).trim();
+  if (!raw.startsWith('#')) {
+    raw = '#' + raw;
+  }
+  // Expand 3-digit hex #RGB -> #RRGGBB
+  if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+    raw = '#' + raw[1] + raw[1] + raw[2] + raw[2] + raw[3] + raw[3];
+  }
+
+  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(raw);
+  const hex = isValidHex ? raw.toUpperCase() : fallback;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  const rgb: RgbColor = {
+    r,
+    g,
+    b,
+    css: `rgb(${r}, ${g}, ${b})`,
+  };
+
+  const hsl = rgbToHsl(r, g, b);
+  return { hex, rgb, hsl };
+}

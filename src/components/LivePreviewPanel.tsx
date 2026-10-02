@@ -96,7 +96,15 @@ export function LivePreviewPanel({
     isDraggingRef.current = false;
   };
 
-  const hasCompareAbility = ['image-compress', 'image-convert', 'image-color', 'image-watermark', 'image-resize', 'image-rotate'].includes(toolId);
+  const hasCompareAbility = [
+    'image-compress',
+    'image-convert',
+    'image-color',
+    'image-watermark',
+    'image-resize',
+    'image-transform',
+    'image-rotate',
+  ].includes(toolId);
 
   const isCompressionGoal = ['image-compress', 'image-convert'].includes(toolId);
   const savedPercent =
